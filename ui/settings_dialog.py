@@ -125,6 +125,16 @@ class SettingsDialog(QDialog):
             self._make_slider_widget(self._nav_cooldown, self._nav_cd_label),
         )
 
+        self._nav_confirm_frames = QSpinBox()
+        self._nav_confirm_frames.setRange(2, 30)
+        self._nav_confirm_frames.setValue(
+            int(self._settings.get("nav_confirm_frames", 6))
+        )
+        gesture_layout.addRow(
+            "Navigation confirm (consecutive frames):",
+            self._nav_confirm_frames,
+        )
+
         gesture_group.setLayout(gesture_layout)
         layout.addWidget(gesture_group)
 
@@ -196,6 +206,7 @@ class SettingsDialog(QDialog):
                 self._tracking_confidence.value() / 100
             ),
             "nav_cooldown": self._nav_cooldown.value() / 10,
+            "nav_confirm_frames": self._nav_confirm_frames.value(),
             "frame_padding_ratio": self._frame_padding.value() / 100,
         }
         self.settings_changed.emit(self._settings)

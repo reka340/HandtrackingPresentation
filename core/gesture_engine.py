@@ -34,6 +34,7 @@ class GestureEngine:
 
     Responsibilities:
     - Applies per-action-type cooldown timers.
+    - Requires consecutive-frame confirmation before slide navigation.
     - Implements timed hold for fist-to-erase.
     """
 
@@ -41,13 +42,33 @@ class GestureEngine:
         self,
         nav_cooldown: float = 1.0,
         fist_hold_time: float = 0.5,
+        nav_confirm_frames: int = 6,
     ):
         self.nav_cooldown = nav_cooldown
         self.fist_hold_time = fist_hold_time
+        self.nav_confirm_frames = max(1, nav_confirm_frames)
 
         self._last_nav_time: float = 0.0
         self._fist_start_time: float | None = None
         self._fist_triggered: bool = False
+        self._nav_streak_gesture: GestureType | None = None
+        self._nav_streak_count: int = 0
+
+    def _reset_nav_streak(self) -> None:
+        self._nav_streak_gesture = None
+        self._nav_streak_count = 0
+
+    def _nav_gesture_confirmed(self, nav_gesture: GestureType) -> bool:
+        """Update same-gesture frame count; return True once threshold is met."""
+        if self._nav_streak_gesture != nav_gesture:
+            self._nav_streak_gesture = nav_gesture
+            self._nav_streak_count = 1
+        else:
+            self._nav_streak_count = min(
+                self._nav_streak_count + 1,
+                self.nav_confirm_frames,
+            )
+        return self._nav_streak_count >= self.nav_confirm_frames
 
     def update(self, gesture_result: GestureResult) -> Action | None:
         """Process a gesture result and return an action if warranted."""
@@ -57,27 +78,34 @@ class GestureEngine:
         # --- Navigation ---
         if gesture == GestureType.PINKY_NEXT:
             self._reset_fist()
-            if now - self._last_nav_time > self.nav_cooldown:
-                self._last_nav_time = now
-                return Action(
-                    ActionType.NEXT_SLIDE,
-                    confidence=gesture_result.confidence,
-                )
-            return None
+            if not self._nav_gesture_confirmed(GestureType.PINKY_NEXT):
+                return None
+            if now - self._last_nav_time <= self.nav_cooldown:
+                return None
+            self._last_nav_time = now
+            self._reset_nav_streak()
+            return Action(
+                ActionType.NEXT_SLIDE,
+                confidence=gesture_result.confidence,
+            )
 
         if gesture == GestureType.THUMB_PREV:
             self._reset_fist()
-            if now - self._last_nav_time > self.nav_cooldown:
-                self._last_nav_time = now
-                return Action(
-                    ActionType.PREV_SLIDE,
-                    confidence=gesture_result.confidence,
-                )
-            return None
+            if not self._nav_gesture_confirmed(GestureType.THUMB_PREV):
+                return None
+            if now - self._last_nav_time <= self.nav_cooldown:
+                return None
+            self._last_nav_time = now
+            self._reset_nav_streak()
+            return Action(
+                ActionType.PREV_SLIDE,
+                confidence=gesture_result.confidence,
+            )
 
         # --- Pointer ---
         if gesture == GestureType.POINTER:
             self._reset_fist()
+            self._reset_nav_streak()
             if gesture_result.pointer_pos:
                 return Action(
                     ActionType.POINTER_MOVE,
@@ -89,6 +117,7 @@ class GestureEngine:
         # --- Draw ---
         if gesture == GestureType.DRAW:
             self._reset_fist()
+            self._reset_nav_streak()
             if gesture_result.pointer_pos:
                 return Action(
                     ActionType.DRAW_POINT,
@@ -99,6 +128,7 @@ class GestureEngine:
 
         # --- Fist hold -> erase last stroke ---
         if gesture == GestureType.FIST:
+            self._reset_nav_streak()
             if self._fist_start_time is None:
                 self._fist_start_time = now
                 self._fist_triggered = False
@@ -115,6 +145,7 @@ class GestureEngine:
 
         # --- No recognized gesture ---
         self._reset_fist()
+        self._reset_nav_streak()
         return None
 
     def _reset_fist(self) -> None:

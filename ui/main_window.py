@@ -96,6 +96,9 @@ class MainWindow(QMainWindow):
         return GestureEngine(
             nav_cooldown=self._settings["nav_cooldown"],
             fist_hold_time=self._settings.get("fist_hold_time", 1.5),
+            nav_confirm_frames=int(
+                self._settings.get("nav_confirm_frames", 6)
+            ),
         )
 
     # ==================================================================

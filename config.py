@@ -10,6 +10,7 @@ DEFAULT_SETTINGS = {
     "min_detection_confidence": 0.7,
     "min_tracking_confidence": 0.5,
     "nav_cooldown": 1.0,
+    "nav_confirm_frames": 6,
     "fist_hold_time": 0.5,
     "frame_padding_ratio": 0.35,
 }
