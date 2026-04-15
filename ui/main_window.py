@@ -278,15 +278,15 @@ class MainWindow(QMainWindow):
                     self._annotation_manager.finish_stroke()
                     self._is_drawing = False
                     self._draw_lost_frames = 0
+                    self._slide_view.set_pointer(None)
                     self._update_annotations()
             else:
                 self._draw_lost_frames = 0
-
-            # Pointer: persist for a few frames, then clear
-            self._pointer_lost_frames += 1
-            if self._pointer_lost_frames >= 4:
-                self._slide_view.set_pointer(None)
-                self._last_pointer_pos = None
+                # Pointer: persist for a few frames, then clear (not while drawing)
+                self._pointer_lost_frames += 1
+                if self._pointer_lost_frames >= 4:
+                    self._slide_view.set_pointer(None)
+                    self._last_pointer_pos = None
 
     # ==================================================================
     # Action handling
@@ -297,6 +297,7 @@ class MainWindow(QMainWindow):
         if action.action_type != ActionType.DRAW_POINT and self._is_drawing:
             self._annotation_manager.finish_stroke()
             self._is_drawing = False
+            self._slide_view.set_pointer(None)
             self._update_annotations()
 
         if action.action_type == ActionType.NEXT_SLIDE:
@@ -320,7 +321,6 @@ class MainWindow(QMainWindow):
 
         elif action.action_type == ActionType.DRAW_POINT:
             self._is_drawing = True
-            self._slide_view.set_pointer(None)
             if action.position:
                 # EMA smoothing for drawing points
                 pos = action.position
@@ -332,7 +332,15 @@ class MainWindow(QMainWindow):
                     )
                 self._last_pointer_pos = pos
                 self._annotation_manager.add_point(pos[0], pos[1])
+                self._slide_view.set_pointer(
+                    pos,
+                    draw_preview=True,
+                    stroke_color=self._annotation_manager.pen_color,
+                    stroke_tool=self._annotation_manager.tool,
+                )
                 self._update_annotations()
+            else:
+                self._slide_view.set_pointer(None)
 
         elif action.action_type == ActionType.ERASE_LAST:
             self._undo()
@@ -401,12 +409,23 @@ class MainWindow(QMainWindow):
 
     def _on_pen_color_changed(self, color: str) -> None:
         self._annotation_manager.pen_color = color
+        self._refresh_draw_pointer_overlay()
 
     def _on_pen_width_changed(self, width: int) -> None:
         self._annotation_manager.pen_width = width
 
     def _on_tool_changed(self, tool: str) -> None:
         self._annotation_manager.tool = tool
+        self._refresh_draw_pointer_overlay()
+
+    def _refresh_draw_pointer_overlay(self) -> None:
+        if self._is_drawing and self._last_pointer_pos is not None:
+            self._slide_view.set_pointer(
+                self._last_pointer_pos,
+                draw_preview=True,
+                stroke_color=self._annotation_manager.pen_color,
+                stroke_tool=self._annotation_manager.tool,
+            )
 
     # ==================================================================
     # Status bar

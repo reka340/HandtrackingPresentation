@@ -19,6 +19,9 @@ class SlideView(QWidget):
         self._annotations: list[Stroke] = []
         self._current_stroke: Stroke | None = None
         self._pointer_pos: tuple[float, float] | None = None
+        self._pointer_draw_preview: bool = False
+        self._pointer_stroke_color: str | None = None
+        self._pointer_stroke_tool: str = "pen"
         self._zoom_scale: float = 1.0
 
         self.setMinimumSize(640, 480)
@@ -30,6 +33,8 @@ class SlideView(QWidget):
     def set_slide(self, image: QImage) -> None:
         self._slide_image = image
         self._pointer_pos = None
+        self._pointer_draw_preview = False
+        self._pointer_stroke_color = None
         self.update()
 
     def set_annotations(
@@ -41,8 +46,22 @@ class SlideView(QWidget):
         self._current_stroke = current_stroke
         self.update()
 
-    def set_pointer(self, pos: tuple[float, float] | None) -> None:
+    def set_pointer(
+        self,
+        pos: tuple[float, float] | None,
+        *,
+        draw_preview: bool = False,
+        stroke_color: str | None = None,
+        stroke_tool: str = "pen",
+    ) -> None:
         self._pointer_pos = pos
+        if pos is None:
+            self._pointer_draw_preview = False
+            self._pointer_stroke_color = None
+        else:
+            self._pointer_draw_preview = draw_preview
+            self._pointer_stroke_color = stroke_color
+            self._pointer_stroke_tool = stroke_tool
         self.update()
 
     def set_zoom(self, scale: float) -> None:
@@ -113,7 +132,7 @@ class SlideView(QWidget):
         if self._current_stroke:
             self._draw_stroke(painter, self._current_stroke, slide_rect)
 
-        # Pointer
+        # Pointer / draw tap preview
         if self._pointer_pos:
             self._draw_pointer(painter, slide_rect)
 
@@ -155,13 +174,26 @@ class SlideView(QWidget):
             )
             painter.drawLine(x1, y1, x2, y2)
 
+    def _pointer_outer_color(self) -> QColor:
+        if (
+            self._pointer_draw_preview
+            and self._pointer_stroke_color
+        ):
+            c = QColor(self._pointer_stroke_color)
+            if self._pointer_stroke_tool == "highlighter":
+                c.setAlpha(80)
+            else:
+                c.setAlpha(180)
+            return c
+        return QColor(255, 50, 50, 180)
+
     def _draw_pointer(self, painter: QPainter, slide_rect: QRect) -> None:
         assert self._pointer_pos is not None
         px = slide_rect.x() + int(self._pointer_pos[0] * slide_rect.width())
         py = slide_rect.y() + int(self._pointer_pos[1] * slide_rect.height())
 
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(255, 50, 50, 180))
+        painter.setBrush(self._pointer_outer_color())
         painter.drawEllipse(QPoint(px, py), 8, 8)
         painter.setBrush(QColor(255, 255, 255, 200))
         painter.drawEllipse(QPoint(px, py), 3, 3)
