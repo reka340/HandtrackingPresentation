@@ -147,8 +147,8 @@ class SlideView(QWidget):
         color = QColor(stroke.color)
         width = stroke.width
         if stroke.tool == "highlighter":
-            color.setAlpha(80)
-            width = stroke.width * 4
+            color.setAlpha(20)
+            width = max(stroke.width * 10, 18)
 
         pen = QPen(
             color,
@@ -181,7 +181,7 @@ class SlideView(QWidget):
         ):
             c = QColor(self._pointer_stroke_color)
             if self._pointer_stroke_tool == "highlighter":
-                c.setAlpha(80)
+                c.setAlpha(20)
             else:
                 c.setAlpha(180)
             return c
@@ -194,6 +194,13 @@ class SlideView(QWidget):
 
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(self._pointer_outer_color())
-        painter.drawEllipse(QPoint(px, py), 8, 8)
+        if (
+            self._pointer_draw_preview
+            and self._pointer_stroke_tool == "highlighter"
+        ):
+            outer_r = 14
+        else:
+            outer_r = 8
+        painter.drawEllipse(QPoint(px, py), outer_r, outer_r)
         painter.setBrush(QColor(255, 255, 255, 200))
         painter.drawEllipse(QPoint(px, py), 3, 3)
