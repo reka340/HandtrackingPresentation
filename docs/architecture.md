@@ -1,8 +1,9 @@
 # Architecture
 
-This document specifies three things: the per-frame processing pipeline, the
-normalised coordinate convention used to store all geometric data, and the
-closed gesture vocabulary recognised by the application.
+*Presentation Helper* turns a webcam feed into a hands-free controller for a
+slide deck: the user navigates, points, draws and erases on the current slide
+using a small set of static hand poses. This document describes the architecture of this system.
+
 
 ## 1. Per-frame pipeline
 
