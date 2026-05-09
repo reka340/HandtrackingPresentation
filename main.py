@@ -1,5 +1,3 @@
-"""Entry point for the Presentation Helper application."""
-
 from __future__ import annotations
 
 import os
