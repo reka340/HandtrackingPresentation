@@ -27,6 +27,7 @@ class PresentationToolbar(QToolBar):
     redo_requested = Signal()
     clear_requested = Signal()
     open_pdf_requested = Signal()
+    save_annotated_pdf_requested = Signal()
     settings_requested = Signal()
     timer_toggle_requested = Signal()
 
@@ -47,6 +48,18 @@ class PresentationToolbar(QToolBar):
         self._open_action.setShortcut("Ctrl+O")
         self._open_action.triggered.connect(self.open_pdf_requested.emit)
         self.addAction(self._open_action)
+
+        # --- Save annotated PDF ---
+        self._save_pdf_action = QAction("Save Annotated PDF", self)
+        self._save_pdf_action.setShortcut("Ctrl+S")
+        self._save_pdf_action.setToolTip(
+            "Save a copy of the PDF with all drawn annotations baked in"
+            " (Ctrl+S)"
+        )
+        self._save_pdf_action.triggered.connect(
+            self.save_annotated_pdf_requested.emit
+        )
+        self.addAction(self._save_pdf_action)
 
         self.addSeparator()
 

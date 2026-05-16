@@ -29,7 +29,7 @@ from config import DEFAULT_SETTINGS, FRAME_RATE_MS
 from core.annotation_manager import AnnotationManager
 from core.gesture_engine import ActionType, GestureEngine
 from core.hand_tracker import HandTracker
-from core.pdf_renderer import PdfRenderer
+from core.pdf_renderer import PdfRenderer, export_annotated_pdf
 from ui.camera_preview import CameraPreview
 from ui.gesture_indicator import GestureIndicator
 from ui.settings_dialog import SettingsDialog
@@ -159,6 +159,9 @@ class MainWindow(QMainWindow):
         self._toolbar = PresentationToolbar()
         self.addToolBar(self._toolbar)
         self._toolbar.open_pdf_requested.connect(self._open_pdf)
+        self._toolbar.save_annotated_pdf_requested.connect(
+            self._save_annotated_pdf
+        )
         self._toolbar.pen_color_changed.connect(self._on_pen_color_changed)
         self._toolbar.pen_width_changed.connect(self._on_pen_width_changed)
         self._toolbar.tool_changed.connect(self._on_tool_changed)
@@ -479,6 +482,84 @@ class MainWindow(QMainWindow):
     def _on_thumbnail_clicked(self, row: int) -> None:
         if row >= 0:
             self._go_to_slide(row)
+
+    # ==================================================================
+    # Annotated-PDF export
+    # ==================================================================
+
+    def _default_annotated_pdf_path(self) -> str:
+        """Suggest ``<deck>.annotated.pdf`` next to the loaded PDF."""
+        pdf_path = self._pdf_renderer.file_path
+        if pdf_path:
+            base, _ = os.path.splitext(pdf_path)
+            return f"{base}.annotated.pdf"
+        return "annotated.pdf"
+
+    def _save_annotated_pdf(self) -> None:
+        if not self._pdf_renderer.is_loaded:
+            QMessageBox.information(
+                self,
+                "No PDF loaded",
+                "Load a PDF before exporting annotations.",
+            )
+            return
+
+        src_path = self._pdf_renderer.file_path
+        if not src_path:
+            QMessageBox.warning(
+                self,
+                "Export failed",
+                "The source PDF path is unknown.",
+            )
+            return
+
+        # Make sure any in-progress stroke is committed before export.
+        self._annotation_manager.finish_stroke()
+        self._is_drawing = False
+        self._update_annotations()
+
+        dest_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Annotated PDF",
+            self._default_annotated_pdf_path(),
+            "PDF Files (*.pdf);;All Files (*)",
+        )
+        if not dest_path:
+            return
+
+        if not dest_path.lower().endswith(".pdf"):
+            dest_path += ".pdf"
+
+        # Refuse to overwrite the source file in place: the exporter opens
+        # the source for reading while writing, and overwriting would also
+        # destroy the original unannotated deck.
+        if os.path.abspath(dest_path) == os.path.abspath(src_path):
+            QMessageBox.warning(
+                self,
+                "Export failed",
+                "Pick a different file name; the annotated copy can't"
+                " overwrite the original PDF.",
+            )
+            return
+
+        strokes_per_slide = {
+            i: self._annotation_manager.get_strokes(i)
+            for i in range(self._pdf_renderer.page_count)
+        }
+
+        try:
+            export_annotated_pdf(src_path, dest_path, strokes_per_slide)
+        except Exception as exc:  # noqa: BLE001 -- surface any backend error
+            QMessageBox.warning(
+                self,
+                "Export failed",
+                f"Could not write annotated PDF:\n{exc}",
+            )
+            return
+
+        self._status_bar.showMessage(
+            f"Annotated PDF saved to {os.path.basename(dest_path)}", 4000
+        )
 
     # ==================================================================
     # Presentation timer

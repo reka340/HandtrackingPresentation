@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Mapping, Sequence
+
 import pymupdf
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QImage, QPixmap
+
+from core.annotation_manager import Stroke
 
 
 class PdfRenderer:
@@ -96,3 +100,94 @@ class PdfRenderer:
             self._doc = None
         self._page_cache.clear()
         self._thumbnail_cache.clear()
+
+
+# ---------------------------------------------------------------------------
+# Annotated-PDF export
+# ---------------------------------------------------------------------------
+
+
+def _hex_to_rgb01(color: str) -> tuple[float, float, float]:
+    """Convert a ``#RRGGBB`` string to a 0..1 RGB tuple for PyMuPDF."""
+    c = color.lstrip("#")
+    if len(c) != 6:
+        # Fall back to black for malformed colors rather than crashing the export.
+        return (0.0, 0.0, 0.0)
+    r = int(c[0:2], 16) / 255.0
+    g = int(c[2:4], 16) / 255.0
+    b = int(c[4:6], 16) / 255.0
+    return (r, g, b)
+
+
+def _stroke_render_params(
+    stroke: Stroke,
+) -> tuple[float, float]:
+    """Return (width_in_points, stroke_opacity) for a given stroke.
+
+    Mirrors the on-screen rendering rules in ``SlideView``: highlighters are
+    drawn much thicker and almost transparent; pens are opaque at their
+    configured width.
+    """
+    if stroke.tool == "highlighter":
+        return float(max(stroke.width * 10, 18)), 20.0 / 255.0
+    return float(stroke.width), 1.0
+
+
+def _draw_stroke_on_page(page: "pymupdf.Page", stroke: Stroke) -> None:
+    """Overlay a single ``Stroke`` onto ``page`` as a vector polyline."""
+    if len(stroke.points) < 2:
+        return
+
+    page_w = page.rect.width
+    page_h = page.rect.height
+    pts = [
+        pymupdf.Point(nx * page_w, ny * page_h) for nx, ny in stroke.points
+    ]
+
+    width_pt, opacity = _stroke_render_params(stroke)
+    color = _hex_to_rgb01(stroke.color)
+
+    shape = page.new_shape()
+    shape.draw_polyline(pts)
+    shape.finish(
+        color=color,
+        width=width_pt,
+        closePath=False,
+        lineCap=1,   # round
+        lineJoin=1,  # round
+        stroke_opacity=opacity,
+        fill=None,
+    )
+    shape.commit()
+
+
+def export_annotated_pdf(
+    src_path: str,
+    dest_path: str,
+    strokes_per_slide: Mapping[int, Sequence[Stroke]],
+) -> None:
+    """Write a new PDF at ``dest_path`` containing the pages of ``src_path``
+    with the supplied strokes burned in on top of each page.
+
+    Strokes are vector overlays (not raster), so the original page content
+    keeps its full quality. Pages with no strokes are copied unchanged.
+
+    Raises ``OSError`` (or PyMuPDF's exceptions) on I/O failure.
+    """
+    src = pymupdf.open(src_path)
+    try:
+        out = pymupdf.open()
+        try:
+            out.insert_pdf(src)
+            for page_index in range(out.page_count):
+                strokes = strokes_per_slide.get(page_index) or ()
+                if not strokes:
+                    continue
+                page = out[page_index]
+                for stroke in strokes:
+                    _draw_stroke_on_page(page, stroke)
+            out.save(dest_path, garbage=4, deflate=True)
+        finally:
+            out.close()
+    finally:
+        src.close()
