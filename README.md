@@ -55,8 +55,9 @@ The main window is split into three vertical panes: a slide-thumbnail
 sidebar on the left, the current slide in the middle, and the live
 camera preview (with the detected hand skeleton and the current
 recognised gesture) on the right. The toolbar on top exposes PDF
-loading, the drawing tool, the colour and width picker, undo/redo,
-the presentation timer and the settings dialog.
+loading, exporting an **annotated copy of the PDF**, the drawing
+tool, the colour and width picker, undo/redo, the presentation
+timer and the settings dialog.
 
 ![Presentation Helper main window with a loaded PDF](docs/images/01-main-window.png)
 
@@ -69,6 +70,9 @@ Feature summary:
   configurable colour and width).
 - Undo (Ctrl+Z), redo (Ctrl+Y), clear current slide.
 - **Closed fist** also undoes the last stroke (half-second hold).
+- Export an annotated copy of the loaded PDF (Ctrl+S) — strokes are
+  burned in as vector overlays so the page content keeps its original
+  quality.
 - Slide-thumbnail sidebar.
 - Presentation timer (start / pause / resume), full-screen mode (F11).
 - Settings dialog: camera index, detection and tracking confidence,
@@ -154,6 +158,7 @@ Classic keyboard shortcuts are also available:
 | `→` / `Space` | Next slide |
 | `←` | Previous slide |
 | `Ctrl + O` | Open PDF |
+| `Ctrl + S` | Save annotated PDF |
 | `Ctrl + Z` / `Ctrl + Y` | Undo / redo |
 | `F11` | Toggle full screen |
 | `Esc` | Exit full screen |
@@ -294,12 +299,12 @@ The current version's deliberate trade-offs and open issues:
 - **PDF input only.** `core/pdf_renderer.py` is built on top of
   PyMuPDF; loading PPTX / HTML / image-based decks is not supported.
   Workaround: export your slides to PDF.
-- **Annotations are not persistent.** Strokes and notes you draw
-  exist **only for the current run**; closing the app discards them.
-  Saving and reloading (`JSON` format) is on the backlog but not yet
-  exposed in the UI.
-- **The presentation timer isn't persistent.** Similarly, the running
-  timer is reset when the app closes.
+- **No autosave for annotations.** Strokes are kept in memory while
+  the app is running and discarded when you close it. To keep them,
+  click **Save Annotated PDF** in the toolbar (or hit `Ctrl + S`);
+  this writes a new PDF next to the original deck with the strokes
+  baked in as vector overlays. There is no in-app reload — open the
+  exported PDF in any PDF viewer.
 - **Webcam permission.** On macOS the OS will explicitly prompt for
   camera access on first launch; if you decline, the app will show a
   black camera feed. You can also switch cameras through the
