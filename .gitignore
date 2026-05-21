@@ -30,7 +30,7 @@ htmlcov/
 Thumbs.db
 desktop.ini
 
-.docs/videos/
-.docs/eval/
-!.docs/eval/figures/
-.scripts/
+docs/videos/
+docs/eval/
+!docs/eval/figures/
+scripts/
