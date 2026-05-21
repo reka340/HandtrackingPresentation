@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -43,16 +44,27 @@ class GestureEngine:
         nav_cooldown: float = 1.0,
         fist_hold_time: float = 0.5,
         nav_confirm_frames: int = 6,
+        time_source: Callable[[], float] | None = None,
     ):
         self.nav_cooldown = nav_cooldown
         self.fist_hold_time = fist_hold_time
         self.nav_confirm_frames = max(1, nav_confirm_frames)
+        # Optional clock injection for offline evaluation. Production code
+        # leaves this as None and the live wall clock is used; offline
+        # evaluators feed in a video-timestamp callable so the cooldown
+        # and fist-hold rules apply in "video time" rather than wall time.
+        self._time_source = time_source
 
         self._last_nav_time: float = 0.0
         self._fist_start_time: float | None = None
         self._fist_triggered: bool = False
         self._nav_streak_gesture: GestureType | None = None
         self._nav_streak_count: int = 0
+
+    def _now(self) -> float:
+        if self._time_source is not None:
+            return self._time_source()
+        return time.time()
 
     def _reset_nav_streak(self) -> None:
         self._nav_streak_gesture = None
@@ -72,7 +84,7 @@ class GestureEngine:
 
     def update(self, gesture_result: GestureResult) -> Action | None:
         """Process a gesture result and return an action if warranted."""
-        now = time.time()
+        now = self._now()
         gesture = gesture_result.gesture
 
         # --- Navigation ---
