@@ -32,6 +32,8 @@ desktop.ini
 
 docs/videos/
 docs/eval/*
+docs/disszertacio/*
 !docs/eval/figures/
 !docs/eval/figures/**
 scripts/
+kerdoiv valaszok/
